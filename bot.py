@@ -1,10 +1,10 @@
 #
 import discord
-import random, cfg, yt, twitch_stuff
-import asyncio, logging, datetime
+import cfg, yt, twitch_stuff, regexgen
+import asyncio, logging, datetime, random
 import re
-import regexgen
 import time
+import gc
 
 
 logging.basicConfig(level=logging.INFO)
@@ -19,35 +19,21 @@ logger.addHandler(handler)
 TOKEN = cfg.D_TOKEN
 
 #Setup for background tasks
-checkedids = ["7NzVI2qCKh8", "4hcVIm0IiP4"]
-latest_id = yt.latestvideo()[0]
+checkedids = []
+latest_id = asyncio.get_event_loop().run_until_complete(yt.latestvideo())[0]
 checkedids.append(latest_id)
 
-me_id = twitch_stuff.get_user_id('zambam5')
-emongg_id = twitch_stuff.get_user_id('emongg')
-if not emongg_id:
-    print('no id for emongg monkaS')
-    have_emongg = False
-else:
-    have_emongg = True
-
-if not me_id:
-    print("your id didn't work idiot PepeLaugh")
-    have_me = False
-else:
-    have_me = True
-
-if have_emongg:
-    emongg_check = twitch_stuff.get_status(emongg_id)
-if have_me:
-    me_check = twitch_stuff.get_status(me_id)
-
+emongg_check = asyncio.get_event_loop().run_until_complete(twitch_stuff.get_status("emongg"))
+me_check = asyncio.get_event_loop().run_until_complete(twitch_stuff.get_status("zambam5"))
 #Setup finished
 
 client = discord.Client()
 
 #creating filter list
-reg_ban_list = regexgen.regexdic
+###reg_ban_list = regexgen.regexdic
+reg_ban_list = dict()
+reg_ban_list['nigg'] = r'(?i)\bnigg+'
+reg_ban_list['faggot'] = r'(?i)\bfaggot'
 reg_ban_list['twitch'] = r'twitch\.tv/.+'
 reg_ban_list['discord'] = r'discord\.gg/.+'
 
@@ -61,12 +47,13 @@ def reg_filter(message, regstring):
         return True
 
 
-def check_live(streamid, live_check):
+async def check_live(streamid, live_check):
     #streamid is string
     #live_check is bool
     currentDT = str(datetime.datetime.now())
     try:
-        new_check = twitch_stuff.get_status(streamid)
+        new_check = await twitch_stuff.get_status(streamid)
+        print(new_check, streamid)
     except:
         logger.exception('message: ')
         return live_check, False
@@ -76,18 +63,12 @@ def check_live(streamid, live_check):
         elif live_check:
             logger.info(streamid + ' still live as of ' + currentDT)
             return new_check, False #(True, False)
-        else:
-            return live_check, False #error
-            print('something broke. live_check = ', live_check)
     elif new_check is False:
         if live_check:
             logger.info(streamid + ' offline at ' + currentDT)
             return new_check, True
         logger.info(streamid + ' not live as of ' + currentDT)
         return new_check, False
-    else:
-        return live_check, False
-        print('something broke. new_check = ', new_check)
 
 
 async def me_ping():
@@ -96,7 +77,7 @@ async def me_ping():
     #if both y and me_check are true, i am offline
     global me_check
     while True:
-        x = check_live(me_id, me_check)
+        x = await check_live("zambam5", me_check)
         me_check1 = x[0]
         y = x[1]
         if y and me_check is False:
@@ -115,7 +96,7 @@ https://www.twitch.tv/zambam5'''
             me_check = me_check1
         else:
             me_check = me_check1
-        if emongg_check:
+        if me_check:
             await asyncio.sleep(1800)
         else:
             await asyncio.sleep(600)
@@ -127,7 +108,7 @@ async def emongg_ping():
     #if emongg_check is true, he was live last check
     #if both y and emongg_check are true, emongg is offline
     while True:
-        x = check_live(emongg_id, emongg_check)
+        x = await check_live("emongg", emongg_check)
         emongg_check1 = x[0]
         y = x[1]
         if y and emongg_check is False:
@@ -160,7 +141,7 @@ async def new_video():
     while True:
         currentDT = str(datetime.datetime.now())
         try:
-            latestvideo = yt.latestvideo()
+            latestvideo = await yt.latestvideo()
         except:
             continue
         check_id = latestvideo[0]
@@ -180,109 +161,53 @@ async def new_video():
             await asyncio.sleep(90)
 
 
+async def streamer_mode():
+    guild = client.get_guild(110671202594373632)
+    role = discord.utils.get(guild.roles, name="Streamer")
+    liverole = discord.utils.get(guild.roles, name="Live")
+    while True:
+        streamers = role.members
+        for streamer in streamers:
+            if liverole in streamer.roles:
+                if streamer.activity == None:
+                    await streamer.remove_roles(liverole)
+                for a in streamer.activities:
+                    if a.type == discord.ActivityType.streaming:
+                        x = False
+                        break
+                    else:
+                        x = True
+                if x:
+                    await streamer.remove_roles(liverole)
+            else:
+                if streamer.activity == None:
+                    continue
+                for a in streamer.activities:
+                    if a.type == discord.ActivityType.streaming:
+                        await streamer.add_roles(liverole)
+                        break
+                    else:
+                        continue
+        print(gc.get_count())
+        await asyncio.sleep(300)
+
+
+
 def is_me(m):
     return m.author == client.user
-
-
-async def pugs(message):
-    #TODO: add variables for channel ids
-    body = message.content
-    bodylist = body.split(" ")
-    cmd = bodylist[0]
-    if cmd == "~!announce":
-        body = " ".join(bodylist[1:])
-        commandlist = body.split(", ")
-        name = message.author.mention
-        region = commandlist[0]
-        t = commandlist[1]
-        tag = commandlist[2]
-        emote = commandlist[3]
-        emote2 = emote.strip('<>')
-        # emote3 = commandlist[4]
-        # emote4 = emote3.strip('<>')
-        role = discord.utils.get(message.guild.roles, name="PUGs")
-        content = "{} will be hosting {} PUGs at {}. Add {} and react with {} if you're interested. PUGs will run if we get 13 reactions that aren't the bot.".format(name, region, t, tag, emote)
-        await role.edit(mentionable=True)
-        channel = client.get_channel(id=555380447509610517)
-        newmessage = await channel.send(role.mention + " " + content)
-        await role.edit(mentionable=False)
-        await newmessage.add_reaction(emote2)
-        # await newmessage.add_reaction(emote4)
-    elif cmd == "~!announceeu":
-        body = " ".join(bodylist[1:])
-        commandlist = body.split(", ")
-        name = message.author.mention
-        t = commandlist[1]
-        tag = commandlist[2]
-        emote = commandlist[3]
-        emote2 = emote.strip('<>')
-        # emote3 = commandlist[4]
-        # emote4 = emote3.strip('<>')
-        role = discord.utils.get(message.guild.roles, name="EU")
-        content1 = "{} will be hosting ".format(name)
-        content2 = " PUGs at {}. Add {} and react with {} if you're interested. PUGs will run if we get 13 reactions that aren't the bot.".format(t, tag, emote)
-        await role.edit(mentionable=True)
-        channel = client.get_channel(id=555380447509610517)
-        newmessage = await channel.send(content1 + role.mention + content2)
-        await role.edit(mentionable=False)
-        await newmessage.add_reaction(emote2)
-        # await newmessage.add_reaction(emote4)
-    elif cmd == "~!start":
-        name = message.author.mention
-        role = discord.utils.get(message.guild.roles, name="PUGs")
-        content = "{} is starting PUGs. Make sure you have added the above tag, then choose to spectate lobby. React with <:white_check_mark:602625053284237314> when you join.".format(name)
-        await role.edit(mentionable=True)
-        channel = client.get_channel(id=555380447509610517)
-        newmessage = await channel.send(role.mention + " " + content)
-        await role.edit(mentionable=False)
-        await newmessage.add_reaction('✅')
-    elif cmd == "~!starteu":
-        name = message.author.mention
-        role = discord.utils.get(message.guild.roles, name="EU")
-        content = "{} is starting PUGs. Make sure you have added the above tag, then choose to spectate lobby. React with <:white_check_mark:602625053284237314> when you join.".format(name)
-        await role.edit(mentionable=True)
-        channel = client.get_channel(id=555380447509610517)
-        newmessage = await channel.send(role.mention + " " + content)
-        await role.edit(mentionable=False)
-        await newmessage.add_reaction('✅')
-    elif cmd == "~!pugs":
-        name = message.author.mention
-        role = discord.utils.get(message.guild.roles, name="PUGs")
-        messagelist=message.content.split(" ")
-        content = ''.join(word + " " for word in messagelist[1:])
-        await role.edit(mentionable=True)
-        channel = client.get_channel(id=555380447509610517)
-        await channel.send(role.mention + " message from " + name + ": " + content)
-        await role.edit(mentionable=False)
-    elif cmd == "~!eu":
-        name = message.author.mention
-        role = discord.utils.get(message.guild.roles, name="EU")
-        messagelist=message.content.split(" ")
-        content = ''.join(word + " " for word in messagelist[1:])
-        await role.edit(mentionable=True)
-        channel = client.get_channel(id=555380447509610517)
-        await channel.send(role.mention + " message from " + name + ": " + content)
-        await role.edit(mentionable=False)
-    elif cmd == '~!purge':
-        channel = client.get_channel(id=555380447509610517)
-        deleted = await channel.purge(limit=100, check=is_me)
-        channel2 = client.get_channel(id=527239830678011905)
-        await channel2.send('Deleted {} messages'.format(len(deleted)))
 
 
 async def emongg_msg(message):
     allowedroles = ['EMONGG',
                     'BOTS',
                     'Streamer',
-                    'MOD',
+                    'Admin',
                     'DATZRAGE',
                     'EVERGREEN',
-                    'Artists'
-]
-    if message.channel.id == 527239830678011905:
-        await pugs(message)
-    else:
-        await msg_filter(message, allowedroles)
+                    'Artists',
+                    'Mod'
+    ]
+    await msg_filter(message, allowedroles)
 
 
 async def msg_filter(message, allowedroles):
@@ -298,7 +223,7 @@ async def msg_filter(message, allowedroles):
                 return
             elif "twitch.tv/emongg" in message.content:
                 return
-            elif message.channel.id == 529760531800915988:
+            elif message.channel.id == 529760531800915988 or message.channel.id == 674980650373218335:
                 return
             roles = message.author.roles
             for role in roles:
@@ -326,7 +251,8 @@ async def msg_filter(message, allowedroles):
                     return
             logger.info('banned')
             guild = message.guild
-            await guild.ban(message.author, delete_message_days=1)
+            reason = '\"' + message.content + '\"'
+            await guild.ban(message.author, reason = reason, delete_message_days=1)
 
 
 time_units = {
@@ -335,6 +261,7 @@ time_units = {
             's': 1
 }
 reminder_list=[]
+
 
 async def remind_me(message, reminders):
     if message.guild.id != 504675193751601152:
@@ -388,7 +315,6 @@ async def check_reminders():
         await asyncio.sleep(5)
 
 
-
 @client.event
 async def on_message(message):
     global reminder_list
@@ -428,8 +354,9 @@ async def on_message(message):
 async def on_ready():
     await client.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="you struggle"))
     print("Logged in as " + client.user.name)
+    client.loop.create_task(streamer_mode())
 
-'''@client.event
+@client.event
 async def on_message_delete(message):
     logger.info('message deleted')
     guild = message.guild.name
@@ -461,17 +388,15 @@ async def on_message_delete(message):
         embed.set_author(name="{}".format(name), icon_url="{}".format(pfp))
         embed.set_footer(text="ID: {}".format(userid))
         channel2 = client.get_channel(id=544928115202195487)
-        await channel2.send(embed=embed)'''
+        await channel2.send(embed=embed)
 
 try:
     client.loop.create_task(new_video())
     client.loop.create_task(check_reminders())
-    if have_emongg:
-        print('creating loop for emongg')
-        client.loop.create_task(emongg_ping())
-    if have_me:
-        print('creating loop for me')
-        client.loop.create_task(me_ping())
+    print('creating loop for emongg')
+    client.loop.create_task(emongg_ping())
+    print('creating loop for me')
+    client.loop.create_task(me_ping())
     client.run(TOKEN)
 except:
     logger.exception("message:")

@@ -1,39 +1,39 @@
-from twitch import TwitchClient
-import requests, json
+import aiohttp, json
 import cfg
 
 token = cfg.TTV_TOKEN
 ID = cfg.TTV_ID
 
-def get_user_id(username):
+async def get_user_id(username):
     headers = {
-            'Accept': 'application/vnd.twitchtv.v5+json',
             'Client-ID': ID,
-            'Authorization': 'OAuth {}'.format(token)
+            'Authorization': 'Bearer {}'.format(token)
         }
-    url = "https://api.twitch.tv/kraken/users?login={}".format(username)
-    response = requests.get(url, params=None, headers=headers).json()
-    try:
-        userid = response['users'][0]['_id']
-        return userid
-    except:
-        print(response)
-        return False
+    url = "https://api.twitch.tv/helix/users?login={}".format(username)
+    async with aiohttp.ClientSession(headers=headers) as session:
+        async with session.get(url) as response:
+            try:
+                userid1 = await response.json()
+                userid = userid1['users'][0]['id']
+                return userid
+            except:
+                print(response)
+                return False
 
 
-def get_status(userid):
+async def get_status(userid):
     headers = {
-            'Accept': 'application/vnd.twitchtv.v5+json',
             'Client-ID': ID,
+            'Authorization': 'Bearer {}'.format(token)
         }
-    url = 'https://api.twitch.tv/kraken/streams/{}'.format(userid)
-    response = requests.get(url, params=None, headers=headers).json()
-    print(response)
-    try:
-        if response['stream']==None:
-            return False
-        else:
-            return True
-    except:
-        print('we have a problem here')
-        return
+    url = 'https://api.twitch.tv/helix/streams?user_login={}'.format(userid)
+    async with aiohttp.ClientSession(headers=headers) as session:
+        async with session.get(url) as res:
+            response = await res.json()
+            print(userid, response['data'])
+            if response['data'] == []:
+                print('not live')
+                return False
+            else:
+                print('live')
+                return True
