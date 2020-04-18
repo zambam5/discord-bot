@@ -53,7 +53,6 @@ async def check_live(streamid, live_check):
     currentDT = str(datetime.datetime.now())
     try:
         new_check = await twitch_stuff.get_status(streamid)
-        print(new_check, streamid)
     except:
         logger.exception('message: ')
         return live_check, False
@@ -188,7 +187,7 @@ async def streamer_mode():
                         break
                     else:
                         continue
-        print(gc.get_count())
+        gc.collect()
         await asyncio.sleep(300)
 
 
@@ -354,7 +353,16 @@ async def on_message(message):
 async def on_ready():
     await client.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="you struggle"))
     print("Logged in as " + client.user.name)
-    client.loop.create_task(streamer_mode())
+    taskset = asyncio.all_tasks(client.loop)
+    tasknames = [i.get_name() for i in taskset]
+    if "streamermode" in tasknames:
+        for task in taskset:
+            if task.get_name() == 'streamermode':
+                task.cancel()
+                client.loop.create_task(streamer_mode(), name='streamermode')
+    else:
+        client.loop.create_task(streamer_mode(), name='streamermode')
+        
 
 @client.event
 async def on_message_delete(message):
@@ -397,6 +405,7 @@ try:
     client.loop.create_task(emongg_ping())
     print('creating loop for me')
     client.loop.create_task(me_ping())
+    start_time = time.time()
     client.run(TOKEN)
 except:
     logger.exception("message:")
