@@ -1,10 +1,16 @@
 #
 import discord
-import cfg, yt2, twitch_stuff2, regexgen
-import asyncio, logging, datetime, random
+import asyncio
+import logging
+import datetime
 import re
 import time
 import gc
+import json
+import configparser
+import os.path
+#local modules:
+import yt2, twitch_stuff2, regexgen, cfg
 
 
 logging.basicConfig(level=logging.DEBUG)
@@ -15,12 +21,19 @@ formatter = logging.Formatter('''%(asctime)s -
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
+config = configparser.ConfigParser()
+config.read('cfg.ini')
+print(config['YOUTUBE']['TOKEN'])
 
-TOKEN = cfg.D_TOKEN
+
+TOKEN = config['DISCORD']['TOKEN']
+yt_token = str(config['YOUTUBE']['TOKEN'])
+yt_id = str(config['YOUTUBE']['ID'])
 
 #Setup for background tasks
 async def init_youtube():
-    return await yt2.YouTubeAPI.create(cfg.YT_ID, cfg.YT_TOKEN)
+    #return await yt2.YouTubeAPI.create(cfg.YT_ID, cfg.YT_TOKEN)
+    return await yt2.YouTubeAPI.create(yt_id, yt_token)
 
 youtube = asyncio.get_event_loop().run_until_complete(init_youtube())
 
@@ -28,7 +41,7 @@ checkedids = []
 latest_id = asyncio.get_event_loop().run_until_complete(youtube.latestvideo())[0]
 checkedids.append(latest_id)
 
-twitch = twitch_stuff2.TwitchAPI(cfg.TTV_ID, cfg.TTV_TOKEN)
+twitch = twitch_stuff2.TwitchAPI(config['TWITCH']['ID'], config['TWITCH']['TOKEN'])
 emongg_check = asyncio.get_event_loop().run_until_complete(twitch.get_status("emongg"))
 me_check = asyncio.get_event_loop().run_until_complete(twitch.get_status("zambam5"))
 print(emongg_check, me_check)
@@ -61,7 +74,9 @@ async def check_live(streamid, live_check):
     except:
         logger.exception('message: ')
         return live_check, False
-    if new_check == live_check:
+    if "expired" in new_check:
+        return "expired"
+    elif new_check == live_check:
         logger.info(streamid + ' no status change as of ' + currentDT)
         return new_check, False #don't do anything
     else:
@@ -83,70 +98,80 @@ async def me_ping():
     while True:
         print(me_check)
         check = await check_live("zambam5", me_check)
-        me_check1 = check[0]
-        job = check[1]
-        if not job:
-            me_check = me_check1
-        elif job == 'live':
-            game = me_check1[1]
-            message = f'@everyone beep boop zambam is live on {game} \r\n https://www.twitch.tv/zambam5'
-            channel = client.get_channel(id=511209374883250197)
-            await channel.send(message)
-            me_check = me_check1
-        elif job == 'offline':
-            currentDT = str(datetime.datetime.now())
-            logger.info('purging messages at ' + currentDT)
-            channel = client.get_channel(id=511209374883250197)
-            await channel.purge(limit=100, check=is_me)
-            me_check = me_check1
-        elif job == 'game':
-            game = me_check1[1]
-            message = f'zambam is switching to {game}'
-            channel = client.get_channel(id=511209374883250197)
-            await channel.send(message)
-            me_check = me_check1
-        if me_check[0]:
-            await asyncio.sleep(1800)
+        if check == "expired":
+            channel = client.get_channel(id=422170422516121612)
+            channel.send('token expired, pls fix')
+            await asyncio.sleep(36000)
         else:
-            await asyncio.sleep(600)
+            me_check1 = check[0]
+            job = check[1]
+            if not job:
+                me_check = me_check1
+            elif job == 'live':
+                game = me_check1[1]
+                message = f'@everyone beep boop zambam is live on {game} \r\n https://www.twitch.tv/zambam5'
+                channel = client.get_channel(id=511209374883250197)
+                await channel.send(message)
+                me_check = me_check1
+            elif job == 'offline':
+                currentDT = str(datetime.datetime.now())
+                logger.info('purging messages at ' + currentDT)
+                channel = client.get_channel(id=511209374883250197)
+                await channel.purge(limit=100, check=is_me)
+                me_check = me_check1
+            elif job == 'game':
+                game = me_check1[1]
+                message = f'zambam is switching to {game}'
+                channel = client.get_channel(id=511209374883250197)
+                await channel.send(message)
+                me_check = me_check1
+            if me_check[0]:
+                await asyncio.sleep(1800)
+            else:
+                await asyncio.sleep(600)
 
 
 async def emongg_ping():
     global emongg_check
     while True:
         check = await check_live("emongg", emongg_check)
-        emongg_check1 = check[0]
-        print(emongg_check1)
-        job = check[1]
-        if not job:
-            emongg_check = emongg_check1
-        elif job == 'live':
-            game = emongg_check1[1]
-            currentDT = str(datetime.datetime.now())
-            logger.info('posting message at ' + currentDT)
-            message = f'@everyone emongg is live on {game} <:FeelsOkayMan:585969133368246308> \r\n https://www.twitch.tv/emongg'
-            channel = client.get_channel(id=611949109854863420)
-            await channel.purge(limit=100, check=is_me)
-            await channel.send(message)
-            emongg_check = emongg_check1
-        elif job == 'offline':
-            currentDT = str(datetime.datetime.now())
-            logger.info('purging messages at ' + currentDT)
-            channel = client.get_channel(id=611949109854863420)
-            await channel.purge(limit=100, check=is_me)
-            message = "Not live <:FeelsStrongMan:585969881003065367>"
-            await channel.send(message)
-            emongg_check = emongg_check1
-        elif job == 'game':
-            game = emongg_check1[1]
-            message = f'emongg switched to {game}'
-            channel = client.get_channel(id=611949109854863420)
-            await channel.send(message)
-            emongg_check = emongg_check1
-        if emongg_check[0]:
-            await asyncio.sleep(300)
+        if check == "expired":
+            channel = client.get_channel(id=274472040273281024)
+            channel.send('token expired, pls fix')
+            await asyncio.sleep(36000)
         else:
-            await asyncio.sleep(60)
+            emongg_check1 = check[0]
+            print(emongg_check1)
+            job = check[1]
+            if not job:
+                emongg_check = emongg_check1
+            elif job == 'live':
+                game = emongg_check1[1]
+                currentDT = str(datetime.datetime.now())
+                logger.info('posting message at ' + currentDT)
+                message = f'@everyone emongg is live on {game} <:FeelsOkayMan:585969133368246308> \r\n https://www.twitch.tv/emongg'
+                channel = client.get_channel(id=611949109854863420)
+                await channel.purge(limit=100, check=is_me)
+                await channel.send(message)
+                emongg_check = emongg_check1
+            elif job == 'offline':
+                currentDT = str(datetime.datetime.now())
+                logger.info('purging messages at ' + currentDT)
+                channel = client.get_channel(id=611949109854863420)
+                await channel.purge(limit=100, check=is_me)
+                message = "Not live <:FeelsStrongMan:585969881003065367>"
+                await channel.send(message)
+                emongg_check = emongg_check1
+            elif job == 'game':
+                game = emongg_check1[1]
+                message = f'emongg switched to {game}'
+                channel = client.get_channel(id=611949109854863420)
+                await channel.send(message)
+                emongg_check = emongg_check1
+            if emongg_check[0]:
+                await asyncio.sleep(300)
+            else:
+                await asyncio.sleep(60)
 
 async def new_video():
     global latest_id
@@ -225,6 +250,15 @@ async def emongg_msg(message):
 
 
 async def msg_filter(message, allowedroles):
+    name = message.author.mention
+    try:
+        roles = message.author.roles
+    except:
+        print(name)
+        return
+    for role in roles:
+        if role.name in allowedroles:
+            return
     for word in reg_ban_list.keys():
         y = reg_filter(message.content, reg_ban_list[word])
         if y:
@@ -239,30 +273,18 @@ async def msg_filter(message, allowedroles):
                 return
             elif message.channel.id == 529760531800915988 or message.channel.id == 674980650373218335:
                 return
-            roles = message.author.roles
-            for role in roles:
-                if role.name in allowedroles:
-                    return
             logger.info('twitch link')
             name = message.author.mention
             await message.delete()
             channel = message.channel
             await channel.send("no twitch links {}".format(name))
         elif banned_word == 'discord':
-            roles = message.author.roles
-            for role in roles:
-                if role.name in allowedroles:
-                    return
             logger.info('discord link')
             name = message.author.mention
             await message.delete()
             channel = message.channel
             await channel.send("no discord invites {}".format(name))
         else:
-            roles = message.author.roles
-            for role in roles:
-                if role.name in allowedroles:
-                    return
             logger.info('banned')
             guild = message.guild
             reason = '\"' + message.content + '\"'
@@ -275,6 +297,11 @@ time_units = {
             's': 1
 }
 reminder_list=[]
+if os.path.isfile('reminders.json'):
+    with open('reminders.json', 'r') as f:
+        reminder_list = json.load(f)
+        print(reminder_list)
+
 
 
 async def remind_me(message, reminders):
@@ -304,11 +331,13 @@ async def remind_me(message, reminders):
                 'future': remindtime,
                 'author': name,
                 'reminder': reminder,
-                'channel': channel
+                'channel': channel.id
                 }
             )
             logger.info('reminder added for ' + str(message.author))
             await channel.send(name + " I will remind you in {} seconds".format(seconds))
+            with open('reminders.json', 'w') as f:
+                f.write(json.dumps(reminders))
             return reminders
     else:
         return reminders
@@ -320,7 +349,8 @@ async def check_reminders():
         to_remove = []
         for reminder in reminder_list:
             if reminder['future'] <= time.time():
-                await reminder['channel'].send(reminder['author'] + " here is your reminder for " + reminder['reminder'])
+                channel = client.get_channel(reminder['channel'])
+                await channel.send(reminder['author'] + " here is your reminder for " + reminder['reminder'])
                 to_remove.append(reminder)
                 logger.info('reminder removed')
         if to_remove:
@@ -366,6 +396,7 @@ async def on_message(message):
 
 @client.event
 async def on_ready():
+    global reminder_list
     await client.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="you struggle"))
     print("Logged in as " + client.user.name)
     taskset = asyncio.all_tasks(client.loop)

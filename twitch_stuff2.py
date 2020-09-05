@@ -31,12 +31,18 @@ class TwitchAPI:
         async with aiohttp.ClientSession(headers=self.headers) as session:
             async with session.get(url) as res:
                 response = await res.json()
-                if response['data'] == []:
-                    status = [False]
-                    await session.close()
-                else:
-                    gameid = response['data'][0]['game_id']
-                    game = await self.get_game(gameid)
-                    status = [True, game]
-                    await session.close()
+                print(response)
+                try:
+                    if response["status"] == 401:
+                        status = ["expired"]
+                        await session.close()
+                except KeyError:
+                    if response['data'] == []:
+                        status = [False]
+                        await session.close()
+                    else:
+                        gameid = response['data'][0]['game_id']
+                        game = await self.get_game(gameid)
+                        status = [True, game]
+                        await session.close()
         return status
