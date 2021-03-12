@@ -1,0 +1,87 @@
+{
+    "DISCORD":{
+        "TOKEN": string
+    },
+    "YOUTUBE":{
+        "TOKEN": string,
+        "TOKEN2": string,
+        "NOTIFICATIONS":{
+            "emongg":{
+                "ID": string,
+                "channel": int,
+                "message": string,
+                "cd": int,
+                "cd_post_upload": int,
+                "path": string
+            }
+        }
+    },
+    "TWITCH":{
+        "ID": string,
+        "TOKEN": string,
+        "NOTIFICATIONS":{
+            "zambam5":{
+                "channels":{
+                    "error": int,
+                    "ping": int
+                },
+                "messages":{
+                    "error": string,
+                    "ping": string,
+                    "offline": false
+                },
+                "cd":{
+                    "online": int,
+                    "offline": int,
+                    "error": int,
+                    "expired": int
+                }
+            },
+            "emongg":{
+                "channels":{
+                    "error": int,
+                    "ping": int
+                },
+                "messages":{
+                    "error": string,
+                    "ping": string,
+                    "offline": string
+                },
+                "cd":{
+                    "online": int,
+                    "offline": int,
+                    "error": int,
+                    "expired": int
+                }
+            },
+            "zambamexe":{
+                "channels":{
+                    "error": int,
+                    "ping": int
+                },
+                "messages":{
+                    "error": string,
+                    "ping": string,
+                    "offline": string
+                },
+                "cd":{
+                    "online": int,
+                    "offline": int,
+                    "error": int,
+                    "expired": int
+                }
+            }
+        }
+    },
+    "REMINDERS":{
+        "time_units": {
+            "d": 86400,
+            "h": 3600,
+            "m": 60,
+            "s": 1
+        },
+        "path": string,
+        "channels": [ints],
+        "limit": int
+    }
+}
