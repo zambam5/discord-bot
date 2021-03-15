@@ -8,11 +8,29 @@ import time
 
 from discord.ext import tasks, commands
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('__main__.' + __name__)
 
 class Reminders(commands.Cog):
+    """This is a class for a reminder command in a discord bot
+
+    Attributes:
+        bot (class): The discord.py bot object
+        path (str): The file path to a json where the reminders are stored
+        reminder_list (list): List of reminders, each formatted as a dict
+        channels (list): List of IDs (ints) for channels where the remindme command can be used
+        units (dict): [time unit]: [int of time unit in seconds]
+        limit (int): How far in advance a user is allowed to set reminders
+    """
     def __init__(self, bot, path, channels, units, limit):
-        print("starting reminders class")
+        """The constructor for the Reminders class
+
+        Args:
+            bot (class): The discord.py bot object
+            path (str): The file path to a json where the reminders are stored
+            channels (list): List of IDs (ints) for channels where the remindme command can be used
+            units (dict): Dictionary containing conversion from time unit symbol to time in seconds
+            limit (int): How far in advance a user is allowed to set reminders
+        """
         self.bot = bot
         self.reminder_list = self.load_reminder_list(path)
         self.path = path
@@ -23,6 +41,14 @@ class Reminders(commands.Cog):
         self.check_reminders.start()
 
     def load_reminder_list(self, path):
+        """Function to load list of existing reminders from the path attribute
+
+        Args:
+            path (str): Path containing the json of saved reminders
+
+        Returns:
+            list: List of reminders, each of which is a dict
+        """
         if os.path.isfile(path):
             with open(path, 'r') as f:
                 reminder_list = json.load(f)
@@ -30,22 +56,16 @@ class Reminders(commands.Cog):
             reminder_list = []
         return reminder_list
     
-    @commands.Cog.listener()
-    async def on_ready(self):
-        print('We ready')
-    
     @commands.command(name='remindme')
     async def remindme(self, ctx):
-        '''
+        """
         Reminder command
         ~!remindme [time length] [time unit (d, h, m, s)] [reminder message]
         Example:
         ~!remindme 1 m Reminder in 1 minute
         will remind you with the message
         "@you here is your reminder for Reminder in 1 minute
-        This command is only available in 2 channels
-        '''
-        print("we got here")
+        """
         message = ctx.message
         channel = message.channel
         if channel.id in self.channels:
@@ -84,7 +104,11 @@ class Reminders(commands.Cog):
     
     @tasks.loop(seconds=5.0)
     async def check_reminders(self):
-        print("checking reminders")
+        """The loop to check for reminders.
+
+        This function checks every 5 seconds if it needs to remind someone, then if a reminder
+        is more than one minute in the past removes it from the reminder_list.
+        """
         to_remove = [] #the list of reminders that have passed
         for reminder in self.reminder_list:
             if time.time() - reminder['future'] > 60:
@@ -101,7 +125,8 @@ class Reminders(commands.Cog):
     
     @check_reminders.before_loop
     async def before_check_reminders(self):
-        print('waiting...')
+        """Delay start of the loop until the bot object gives the ready event
+        """
         await self.bot.wait_until_ready()
 
 if os.path.isfile('config.json'):

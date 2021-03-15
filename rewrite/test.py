@@ -16,20 +16,13 @@ import twitch_stuff2, yt2
 #from reminders import Reminders
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger('discord')
+logger = logging.getLogger(__name__)
 #logger.setLevel(logging.INFO)
-handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
+dt = datetime.datetime.now().strftime("%Y-%m-%d")
+handler = logging.FileHandler(filename='./logs/discord-' + dt + '.log', encoding='utf-8', mode='w')
 handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
 logger.addHandler(handler)
 
-'''config = configparser.ConfigParser()
-config.read('cfg.ini')
-print(config['YOUTUBE']['TOKEN'])
-
-
-
-yt_token = str(config['YOUTUBE']['TOKEN'])
-yt_id = str(config['YOUTUBE']['ID'])'''
 
 if os.path.isfile('config.json'):
     with open('config.json', 'r') as f:
@@ -39,17 +32,8 @@ if os.path.isfile('config.json'):
 twitch = dict()
 youtube = dict()
 
-intents = Intents()
-intents.guilds = True
-intents.members = True
-intents.presences = True
-intents.messages = True
-intents.reactions = False #THIS IS SUBJECT TO CHANGE
+intents = Intents(guilds = True, members = True, presences = True, messages = True, reactions = False)
 bot = Bot(intents=intents, command_prefix='~!')
-
-'''@bot.event
-async def on_message(message):
-    print('message received')'''
 
 
 @bot.event

@@ -1,11 +1,22 @@
 import aiohttp, json, datetime, logging, asyncio
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('__main__.' + __name__)
 
 class TwitchAPI:
+    """API wrapper for the Twitch API
+
+    Attributes:
+        header (dict): The header used when making a request to the Twitch API
+    """    
     #need to add something for refreshing the token
     def __init__(self, ID, token):
+        """Constructor for the TwitchAPI class
+
+        Args:
+            ID (str): ID for the Twitch API
+            token (str): OAuth token corresponding to the ID
+        """
         self.headers = {
                 'Client-ID': ID,
                 'Authorization': 'Bearer {}'.format(token)
@@ -27,9 +38,16 @@ class TwitchAPI:
     
 
     async def get_status(self, username):
-        '''twitch api reference
-        https://dev.twitch.tv/docs/api/reference#get-streams
-        '''
+        """Fetch the current status of a stream from the Twitch API
+
+        Reference for the Twitch API https://dev.twitch.tv/docs/api/reference#get-streams
+
+        Args:
+            username (str): Username of the streamer whose status is being check
+
+        Returns:
+            list: A list corresponding to various responses from the request
+        """
         url = f'https://api.twitch.tv/helix/streams?user_login={username}'
         async with aiohttp.ClientSession(headers=self.headers) as session:
             async with session.get(url) as res:
@@ -54,17 +72,20 @@ class TwitchAPI:
 
 
 class DiscordNotif:
+    """Class to setup discord notification when a stream goes live
+    """
     def __init__(self, discord, ID, token, stream, channels, messages, cd):
-        '''
-        discord - type: class? - the discord client from bot2.py
-        ID - type: str - twitch ID for above class
-        token - type: str - twitch token for above class
-        stream - type: str - the stream to check for live
-        channels - type: dict - channel ids for error messages or pings
-        messages - type: dict - contains the various types of messages to send
-        cd - type: dict - {'online': type: int - length between calls while online
-                            'offline': type: int - length between calls while offline}
-        '''
+        """Constructor for the DiscordNotif class
+
+        Args:
+            discord (class): Discord client object
+            ID (str): Twitch API ID
+            token (str): OAuth token corresponding to the ID for the Twitch API
+            stream (str): Name of the stream
+            channels (list): List of various channels to send messages, depending on type
+            messages (list): List of messages to send, depending on type
+            cd (dict): Different cooldowns before checking the stream status, depending on most recent status
+        """
         self.discord = discord
         self.client = TwitchAPI(ID, token)
         self.stream = stream
@@ -74,10 +95,27 @@ class DiscordNotif:
     
 
     def is_me(self, m):
-        return m.author == client.user
+        """Function to check if the user is the bot
+
+        Args:
+            m (class): Message object from the Discord module
+
+        Returns:
+            bool: True or False depending on if the user is the bot
+        """
+        return m.author == self.discord.user
     
 
     async def check_live(self, streamid, live_check):
+        """Check the stream status
+
+        Args:
+            streamid (str): Name of the stream
+            live_check (list): Most recent status of the stream
+
+        Returns:
+            list: Current status of the stream
+        """
         currentDT = str(datetime.datetime.now())
         try:
             new_check = await self.client.get_status(streamid)
@@ -102,6 +140,11 @@ class DiscordNotif:
     
 
     async def live_ping(self):
+        """Setup a loop to check the status of a stream
+
+        This function is to be added to the loop made when instantiating the 
+        discord bot. 
+        """
         live_check = await self.client.get_status(self.stream)
         while True:
             check = await self.check_live(self.stream, live_check)
