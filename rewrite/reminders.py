@@ -1,3 +1,4 @@
+import setuptools
 import json
 import aiohttp
 import os
@@ -7,6 +8,7 @@ import asyncio
 import time
 
 from discord.ext import tasks, commands
+from setuptools import Command
 
 logger = logging.getLogger('__main__.' + __name__)
 
@@ -56,7 +58,7 @@ class Reminders(commands.Cog):
             reminder_list = []
         return reminder_list
     
-    @commands.command(name='remindme')
+    @commands.command()
     async def remindme(self, ctx):
         """
         Reminder command
@@ -136,4 +138,5 @@ if os.path.isfile('config.json'):
 r_config = config['REMINDERS']
 
 def setup(bot):
+    logger.info('Reminders loaded')
     bot.add_cog(Reminders(bot, r_config['path'], r_config['channels'], r_config['time_units'], r_config['limit']))

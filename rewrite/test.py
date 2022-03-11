@@ -1,15 +1,9 @@
 import discord
 from discord.ext.commands import Bot
-from discord.ext import tasks
 from discord import Intents
-import asyncio
 import logging
 import datetime
-import re
-import time
-import gc
 import json
-import configparser
 import os.path
 #local modules:
 import twitch_stuff2, yt2
@@ -33,16 +27,22 @@ twitch = dict()
 youtube = dict()
 
 intents = Intents(guilds = True, members = True, presences = True, messages = True, reactions = False)
-bot = Bot(intents=intents, command_prefix='~!')
+bot = Bot(intents=intents, command_prefix='!')
+#bot.tree = app_commands.CommandTree(bot)
 
 
 @bot.event
 async def on_ready():
     await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="you struggle"))
     logger.info("Logged in as " + bot.user.name)
+    #await bot.tree.sync(guild=discord.Object(id=422170422516121610))
+    #await bot.tree.sync(guild=discord.Object(id=504675193751601152))
 
 
 bot.load_extension("reminders")
+bot.load_extension("streamer_role")
+bot.load_extension("misc")
+
 #instantiate the youtube objects
 #begin the background tasks
 for chan in config['YOUTUBE']['NOTIFICATIONS']:
@@ -66,11 +66,12 @@ for chan in config['YOUTUBE']['NOTIFICATIONS']:
 #begin the background tasks
 for stream in config['TWITCH']['NOTIFICATIONS'].keys():
     ID = config['TWITCH']['ID']
-    TOKEN = config['TWITCH']['TOKEN']
+    secret = config['TWITCH']['SECRET']
+    path  = config['TWITCH']['PATH']
     channels = config['TWITCH']['NOTIFICATIONS'][stream]['channels']
     messages = config['TWITCH']['NOTIFICATIONS'][stream]['messages']
     cd = config['TWITCH']['NOTIFICATIONS'][stream]['cd']
-    twitch[stream] = twitch_stuff2.DiscordNotif(bot, ID, TOKEN, stream, channels, messages, cd)
+    twitch[stream] = twitch_stuff2.DiscordNotif(bot, ID, secret, stream, channels, messages, cd, path)
     try:
         logger.info('creating loop for ' + stream)
         bot.loop.create_task(twitch[stream].live_ping())

@@ -195,7 +195,6 @@ class DiscordNotif:
         discord bot. 
         """
         client = await self.start_client()
-        channel = self.discord.get_channel(id=self.channel)
         past_videos = await self.load_past_videos(self.path, client)
         latestvideo = await client.latestvideo()
         latest_id = latestvideo[0]
@@ -214,6 +213,7 @@ class DiscordNotif:
                 logger.info(check_id + " most recent id checked at " + currentDT)
                 await asyncio.sleep(self.cd)
             elif check_id != latest_id:
+                channel = self.discord.get_channel(id=self.channel) #need this here because it has to exist after the bot starts
                 youtube_l = "https://youtu.be/{}".format(check_id)
                 logger.info("new video, posting notification")
                 await channel.send(self.message.format(youtube_l))

@@ -1,37 +1,41 @@
+import setuptools
 import json
-import aiohttp
 import os
-import datetime
 import logging
 import asyncio
-import time
 from discord import utils
 from discord import ActivityType
 
 from discord.ext import tasks, commands
+from setuptools import Command
 
 logger = logging.getLogger('__main__.' + __name__)
+
+def check_if_it_is_me(ctx):
+    return ctx.message.author.id == 297516831227510786
 
 class Misc(commands.Cog):
     def __init__(self, bot, channel):
         self.bot = bot
         self.channel = channel
+        
     
-    @commands.command(name="ping")
-    async def ping(self, ctx):
+    @commands.command(name='ping')
+    #@commands.check(check_if_it_is_me)
+    async def _ping(self, ctx):
+        logger.info('we got here')
         if ctx.message.channel.id == self.channel:
             logger.info('ping received')
-            channel = ctx.message.channel
+            #channel = ctx.message.channel
             try:
-                taskset = asyncio.Task.all_tasks(self.bot.loop)
+                taskset = asyncio.all_tasks(self.bot.loop)
                 tasklist = []
                 print(tasklist)
-                await channel.send('beep boop')
-                await channel.send('I am running ' + str(len(taskset)) + ' tasks')
+                await ctx.send('beep boop')
+                await ctx.send('I am running ' + str(len(taskset)) + ' tasks')
             except:
-                await channel.send('failure :(')
+                await ctx.send('failure :(')
                 logger.exception("message: ")
-
 
 if os.path.isfile('config.json'):
     with open('config.json', 'r') as f:
