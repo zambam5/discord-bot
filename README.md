@@ -1,2 +1,1 @@
-This is a rewrite I am working on. I now use the commands extension from discord.py to add more functionality to the bot. The config file is more structured and more comprehensive, containing more of the pieces that before I had typed into the script.
-The commands extension allows removing some of the loops from the main script using Cogs. However I have not figured out how to do variable timed loops with Cogs so those still require making the background troop using create_task
+This remind me was incredibly out of date so I just removed it. I have no idea what to put here so just erased it
