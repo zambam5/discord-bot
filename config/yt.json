@@ -1,0 +1,18 @@
+{
+    "TOKEN": "",
+    "TOKEN2": "",
+    "NOTIFICATIONS": {
+        "channel": {
+            "ID": "",
+            "channel": ,
+            "messages": [
+                "{} message \r\n  https://youtu.be/{}"
+            ],
+            "cd": 90,
+            "cd_post_upload": 3600,
+            "path": "logs/yt.json",
+            "guild": ,
+            "role":
+        }
+    }
+}

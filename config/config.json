@@ -1,0 +1,30 @@
+{
+    "DISCORD": {
+        "TOKEN": ""
+    },
+    "REMINDERS": {
+        "time_units": {
+            "d": 86400,
+            "h": 3600,
+            "m": 60,
+            "s": 1
+        },
+        "path": "logs/reminders.json",
+        "channels": [
+            819692426968825857,
+            734155971487858819
+        ],
+        "limit": 1209600
+    },
+    "STREAMER_ROLE": {
+        "guild": 110671202594373632,
+        "streamer_role": "",
+        "live_role": "",
+        "cd": 300
+    },
+    "MISC": {
+        "PING": {
+            "channel": 734155971487858819
+        }
+    }
+}

@@ -1,0 +1,35 @@
+{
+    "ID": "",
+    "TOKEN": "",
+    "SECRET": "",
+    "PATH": "logs/twitch.json",
+    "NOTIFICATIONS": {
+        "channel": {
+            "ping": {
+                "custom": [
+                    false
+                ],
+                "messages": [
+                    ""
+                ],
+                "channel": ,
+                "role": ,
+                "guild":
+            },
+            "offline": {
+                "messages": false,
+                "channel":
+            },
+            "game": {
+                "messages": "",
+                "channel":
+            },
+            "cd": {
+                "online": 1800,
+                "offline": 60,
+                "error": 3600,
+                "expired": 36000
+            }
+        }
+    }
+}
