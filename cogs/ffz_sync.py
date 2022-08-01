@@ -2,7 +2,7 @@ import aiohttp, json, datetime, logging, asyncio, time, os
 from discord.ext import tasks, commands
 import discord
 
-from cogs.APIs.ffz_emote import Emote
+from cogs.objects.ffz_emote import Emote
 
 logger = logging.getLogger("__main__." + __name__)
 

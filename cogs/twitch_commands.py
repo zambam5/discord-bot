@@ -1,4 +1,3 @@
-from ast import alias
 import aiohttp, json, datetime, logging, asyncio, time, os, random
 from discord.ext import tasks, commands
 from setuptools import Command
@@ -9,36 +8,6 @@ logger = logging.getLogger("__main__." + __name__)
 
 
 class TwitchCommands(commands.Cog):
-    '''def __init__(self, discord):
-    """Constructor for the DiscordNotif class
-
-    Args:
-        discord (class): Discord client object
-        ID (str): Twitch API ID
-        token (str): OAuth token corresponding to the ID for the Twitch API
-    """
-    self.discord = discord
-    self.configpath = "config/twitch.json"
-    self.process_config(self.configpath)'''
-
-    def process_config(self, configpath: str):
-        # TODO add section to config for server
-        if os.path.isfile(configpath):
-            # check for existing config file
-            with open(configpath, "r") as f:
-                r = json.load(f)
-            self.ID = r["ID"]
-            self.TOKEN = r["TOKEN"]
-            self.secret = r["SECRET"]
-            self.default = r["DEFAULT_ERROR"]
-            self.notifications = r["NOTIFICATIONS"]
-            self.path = r["PATH"]
-            self.status = None
-        # figure out what to do if no config file
-        else:
-            with open(configpath, "w"):
-                f.write(json.dumps({}))
-
     def is_me(self, m):
         """Function to check if the user is the bot
 
@@ -50,11 +19,11 @@ class TwitchCommands(commands.Cog):
         """
         return m.author == self.discord.user
 
-    def update_config(self):
+    def update_config(self, channel):
         logger.info("updating twitch config")
         with open(self.configpath, "r") as f:
             r = json.load(f)
-        r["NOTIFICATIONS"] = self.notifications
+        r["NOTIFICATIONS"][channel] = self.streams[channel].create_dict()
         with open(self.configpath, "w") as f:
             f.write(json.dumps(r))
 
@@ -77,47 +46,45 @@ class TwitchCommands(commands.Cog):
     @message.command()
     async def remove(self, ctx, channel, message_type, message):
         logger.info("removing message from %s", channel)
-        messages = self.notifications[channel][message_type]["messages"]
-        new_messages = [x for x in messages if x != messages[message]]
-        print(new_messages)
-        self.notifications[channel][message_type]["messages"] = new_messages
-        print(self.notifications[channel][message_type]["messages"])
-        self.update_config()
+        self.streams[channel].update_messages(message, message_type, remove=True)
+        self.update_config(channel)
         await ctx.send(f"Updated messages for {channel}")
 
     @message.command()
     async def add(self, ctx, channel, message_type, message):
-        self.notifications[channel][message_type]["messages"].append(message)
-        self.update_config()
+        self.streams[channel].update_messages(message, message_type, add=True)
+        self.update_config(channel)
         logger.info("added message to %s", channel)
         await ctx.send(f"Updated messages for {channel}")
 
     @update.group()
     async def cd(self, ctx, channel, type, amount):
-        self.notifications[channel]["cd"][type] = int(amount)
+        self.streams[channel].update_cd(type, amount)
         logger.info("Updating %s cooldown for %s", type, channel)
-        self.update_config()
+        self.update_config(channel)
         await ctx.send(f"Updated {type} cooldown for {channel}")
 
     @update.command()
     async def settings(self, ctx, channel):
+        # TODO This function also wants the dict from streams.py
+        notifications = self.streams[channel].create_dict()
         embed = discord.Embed(
             title=f"{channel} settings", colour=discord.Colour(0xF15F3E)
         )
-        if not self.notifications[channel]["ping"]["custom"][0]:
+        if not notifications["ping"]["custom"][0]:
             embed.add_field(
                 name="Ping",
                 value=f"The ping messages are:\r\n "
-                + "\r\n".join(self.notifications[channel]["ping"]["messages"])
-                + f"\r\n The ping channel has id {self.notifications[channel]['ping']['channel']}",
+                + "\r\n".join(notifications["ping"]["messages"])
+                + f"\r\n The ping channel has id {notifications['ping']['channel']}",
                 inline=False,
             )
-        elif self.notifications[channel]["ping"]["custom"][1]["embed"]:
+        elif notifications["ping"]["custom"][1]["embed"]:
             embed.add_field(
                 name="Ping",
                 value=f"The ping messages are:\r\n "
-                + "\r\n".join(self.notifications[channel]["ping"]["messages"])
-                + f"\r\n The ping channel has id {self.notifications[channel]['ping']['channel']}.\r\n"
+                + "\r\n".join(notifications["ping"]["messages"])
+                + f"\r\n The ping channel has id {notifications['ping']['channel']}.\r\n"
                 + "There will be a custom mesage with an embed on the next ping",
                 inline=False,
             )
@@ -125,12 +92,12 @@ class TwitchCommands(commands.Cog):
             embed.add_field(
                 name="Ping",
                 value=f"The ping messages are:\r\n "
-                + "\r\n".join(self.notifications[channel]["ping"]["messages"])
-                + f"\r\n The ping channel has id {self.notifications[channel]['ping']['channel']}.\r\n"
+                + "\r\n".join(notifications["ping"]["messages"])
+                + f"\r\n The ping channel has id {notifications['ping']['channel']}.\r\n"
                 + "There will be a custom mesage on the next ping",
                 inline=False,
             )
-        if not self.notifications[channel]["offline"]["messages"]:
+        if not notifications["offline"]["messages"]:
             embed.add_field(
                 name="Offline",
                 value="This channel has no offline message",
@@ -140,15 +107,15 @@ class TwitchCommands(commands.Cog):
             embed.add_field(
                 name="Offline",
                 value=f"The offline messages are:\r\n "
-                + "\r\n".join(self.notifications[channel]["offline"]["messages"])
-                + f"\r\n The offline channel has id {self.notifications[channel]['offline']['channel']}",
+                + "\r\n".join(notifications["offline"]["messages"])
+                + f"\r\n The offline channel has id {notifications['offline']['channel']}",
                 inline=False,
             )
         embed.add_field(
             name="Game",
             value=f"The game change message is:\r\n "
-            + self.notifications[channel]["game"]["messages"]
-            + f"\r\n The game channel has id {self.notifications[channel]['game']['channel']}",
+            + notifications["game"]["messages"]
+            + f"\r\n The game channel has id {notifications['game']['channel']}",
             inline=False,
         )
         embed.add_field(
@@ -156,8 +123,8 @@ class TwitchCommands(commands.Cog):
             value=f"The cooldown periods for the bot to update stream status are:\r\n"
             + "\r\n".join(
                 [
-                    x + ": " + str(self.notifications[channel]["cd"][x])
-                    for x in self.notifications[channel]["cd"].keys()
+                    x + ": " + str(notifications["cd"][x])
+                    for x in notifications["cd"].keys()
                 ]
             ),
         )
@@ -165,13 +132,10 @@ class TwitchCommands(commands.Cog):
 
     @twitch.command()
     async def custommessage(self, ctx, channel, message):
-        self.notifications[channel]["ping"]["custom"] = [True]
-        x = dict()
-        x["embed"] = False
-        x["message"] = message
-        self.notifications[channel]["ping"]["custom"].append(x)
+        embed = False
+        self.streams[channel].add_custom_message(message, embed)
         logger.info("Adding custom ping to %s", channel)
-        self.update_config()
+        self.update_config(channel)
         await ctx.send(
             f"Custom message added for {channel}. It will trigger the next time the stream goes live."
         )
@@ -179,22 +143,16 @@ class TwitchCommands(commands.Cog):
     @twitch.command()
     async def customembed(self, ctx, channel, message, link, title, url=None):
         """"""
-        self.notifications[channel]["ping"]["custom"] = [True]
-        x = dict()
-        x["embed"] = True
-        x["message"] = message
-        x["link"] = link
-        x["title"] = title
-        x["url"] = url
-        self.notifications[channel]["ping"]["custom"].append(x)
+        embed = True
+        self.streams[channel].add_custom_message(message, embed, link, title, url)
         await ctx.send(f"Custom embed set for {channel}")
         logger.info("Adding custom ping with embed to %s", channel)
-        self.update_config()
+        self.update_config(channel)
 
     @twitch.command()
     async def test(self, ctx, username):
         logger.info("Requested to post test message for %s", username)
-        user_info = self.notifications[username]["ping"]
+        user_info = self.streams[username].ping
         game = "Test"
         role = user_info["role"]
         if role == user_info["guild"]:

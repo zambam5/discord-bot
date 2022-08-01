@@ -1,7 +1,6 @@
 import aiohttp, logging
 
 from io import BytesIO
-from PIL import Image
 
 
 logger = logging.getLogger("__main__." + __name__)

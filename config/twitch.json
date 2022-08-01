@@ -13,8 +13,7 @@
                     ""
                 ],
                 "channel": ,
-                "role": ,
-                "guild":
+                "role":
             },
             "offline": {
                 "messages": false,
@@ -29,7 +28,8 @@
                 "offline": 60,
                 "error": 3600,
                 "expired": 36000
-            }
+            },
+            "guild":
         }
     }
 }

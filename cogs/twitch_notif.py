@@ -1,16 +1,19 @@
-from ast import alias
 import aiohttp, json, datetime, logging, asyncio, time, os, random
 from discord.ext import tasks, commands
-from setuptools import Command
 from cogs.APIs.twitch import TwitchAPI
 from cogs.twitch_commands import TwitchCommands
+from cogs.twitch_status import TwitchStatus
 import discord
+from cogs.objects.streams import StreamStatus
 
 logger = logging.getLogger("__main__." + __name__)
 
 
-class DiscordNotif(TwitchCommands):
+class DiscordNotif(TwitchCommands, TwitchStatus):
     # ? Check and see if anything can be made a static method
+    # ^ No, all of them require referencing other attributes or methods
+    # TODO Work on cooldown management
+    # TODO Incorporate a class for handling carrying info for each stream
     """Class to setup discord notification when a stream goes live"""
 
     def __init__(self, discord):
@@ -18,65 +21,75 @@ class DiscordNotif(TwitchCommands):
 
         Args:
             discord (class): Discord client object
-            ID (str): Twitch API ID
-            token (str): OAuth token corresponding to the ID for the Twitch API
         """
         self.discord = discord
         self.configpath = "config/twitch.json"
         self.process_config(self.configpath)
         self.live_ping.start()
 
-    async def start_client(self):
-        """Instantiate the TwitchAPI class
-
-        Sets class attribute for client
-        """
-        self.client = await TwitchAPI.create(self.ID, self.secret, self.path)
-
-    async def get_initial_status(self):
-        """Get first status of each stream
-        Setup initial cooldowns
-        TODO test
-        """
-        # TODO test
-        usernames = self.notifications.keys()
-        response = await self.client.get_status(usernames)
-        self.status = await self.process_response(response, usernames)
-        self.cds = {}
-        for username in usernames:
-            cds = self.notifications[username]["cd"]
-            if self.status[username][0]:
-                self.cds[username] = time.time() + cds["online"]
-            else:
-                self.cds[username] = time.time() + cds["offline"]
-
-    async def process_response(self, response: list, usernames: list):
-        status = {}
-        if response == []:
-            for username in usernames:
-                status[username] = [False]
-        elif response == ["expired"]:
-            # tell it to go again
-            new_check = await self.client.get_status(usernames)
-            return await self.process_response(new_check, usernames)
-            # ? why not status = await self.process_response(new_check, usernames)
+    def process_config(self, configpath: str):
+        # TODO add section to config for server
+        if os.path.isfile(configpath):
+            # check for existing config file
+            with open(configpath, "r") as f:
+                r = json.load(f)
+            self.ID = r["ID"]
+            self.TOKEN = r["TOKEN"]
+            self.secret = r["SECRET"]
+            self.default = r["DEFAULT_ERROR"]
+            self.streams = {}
+            for channel in r["NOTIFICATIONS"]:
+                self.streams[channel] = StreamStatus(r["NOTIFICATIONS"][channel])
+            self.path = r["PATH"]
+            self.status = None
+        # figure out what to do if no config file
         else:
-            for item in response:
-                username = item["user_login"]
-                gameid = item["game_id"]
-                if gameid == "":
-                    game = "Unlisted"
-                else:
-                    game = item["game_name"]
-                status[username] = [True, game]
-            not_live = [i for i in usernames if i not in status]
-            for username in not_live:
-                status[username] = [False]
-        return status
+            with open(configpath, "w"):
+                f.write(json.dumps({}))
+
+    async def custom_starting_message(
+        self, username, user_info, mention, channel, embedded
+    ):
+        if embedded:
+            message_d = user_info["custom"][1]
+            message = mention + " " + message_d["message"]
+            title = message_d["title"]
+            link = message_d["link"]
+            if message_d["url"]:
+                embed = discord.Embed(
+                    title=title,
+                    color=discord.Colour.purple(),
+                    url=message_d["url"],
+                    description=f"[Click here to watch stream](https://twitch.tv/{username})",
+                )
+                embed.set_image(url=link)
+                await channel.purge(limit=100, check=self.is_me)
+                await channel.send(message, embed=embed)
+                self.streams[username].remove_custom_message()
+                self.update_config(channel)
+            else:
+                embed = discord.Embed(
+                    title=title,
+                    color=discord.Colour.purple(),
+                    url=f"https://twitch.tv/{username}",
+                    description=f"[Click here to watch stream](https://twitch.tv/{username})",
+                )
+                embed.set_image(url=link)
+                await channel.purge(limit=100, check=self.is_me)
+                await channel.send(message, embed=embed)
+                self.streams[username].remove_custom_message()
+                self.update_config(username)
+        else:
+            message = mention + " " + user_info["custom"][1]["message"]
+            await channel.purge(limit=100, check=self.is_me)
+            await channel.send(message)
+            self.streams[username].remove_custom_message()
+            self.update_config(channel)
 
     async def stream_starting(self, username, game):
         logger.info("Attempting to post message for %s", username)
-        user_info = self.notifications[username]["ping"]
+        user_info = self.streams[username].ping
+        user_info["guild"] = self.streams[username].guild
         ping_channel = user_info["channel"]
         channel = self.discord.get_channel(id=ping_channel)
         role = user_info["role"]
@@ -90,7 +103,12 @@ class DiscordNotif(TwitchCommands):
             message = mention + " " + random.choice(ping_list).format(game)
             await channel.purge(limit=100, check=self.is_me)
             await channel.send(message)
-        elif user_info["custom"][1]["embed"]:
+        else:
+            embedded = user_info["custom"][1]["embed"]
+            await self.custom_starting_message(
+                username, user_info, mention, channel, embedded
+            )
+        """elif user_info["custom"][1]["embed"]:
             message_d = user_info["custom"][1]
             message = mention + " " + message_d["message"]
             title = message_d["title"]
@@ -124,10 +142,10 @@ class DiscordNotif(TwitchCommands):
             await channel.purge(limit=100, check=self.is_me)
             await channel.send(message)
             self.notifications[username]["ping"]["custom"] = [False]
-            self.update_config()
+            self.update_config()"""
 
     async def stream_ended(self, username):
-        user_info = self.notifications[username]["offline"]
+        user_info = self.streams[username].offline
         ping_channel = user_info["channel"]
         ping_list = user_info["messages"]
         if ping_list != False:
@@ -140,74 +158,26 @@ class DiscordNotif(TwitchCommands):
             await channel.purge(limit=100, check=self.is_me)
 
     async def game_change(self, username, game):
-        user_info = self.notifications[username]["game"]
+        user_info = self.streams[username].game
         ping_channel = user_info["channel"]
         message = user_info["messages"].format(game)
         channel = self.discord.get_channel(id=ping_channel)
         await channel.send(message)
 
-    async def check_live(self, usernames, last_check):
-        """Check the stream status
-
-        Args:
-            streamid (str): Name of the stream
-            last_check (dict): Most recent status of each stream
-
-        Returns:
-            list: Current status of the stream
-        """
-        currentDT = str(datetime.datetime.now())
-        try:
-            response = await self.client.get_status(usernames)
-            new_check = await self.process_response(response, usernames)
-        except:
-            logger.exception("message: ")
-            return last_check, "error"
-
-        if new_check == last_check:
-            usernames_str = ", ".join(usernames)
-            logger.info("%s no status change as of %s", usernames_str, currentDT)
-            return new_check
-        else:
-            for username in usernames:
-                if last_check[username] == new_check[username]:
-                    continue
-                elif time.time() < self.cds[username]:
-                    # not enough time passed since last check
-                    continue
-                else:
-                    cds = self.notifications[username]["cd"]
-                    if not last_check[username][0]:
-                        game = new_check[username][1]
-                        logger.info("%s live at %s", username, currentDT)
-                        await self.stream_starting(username, game)
-                        self.cds[username] = time.time() + cds["online"]
-                        last_check[username] = new_check[username]
-                    elif not new_check[username][0]:
-                        logger.info("%s offline at %s", username, currentDT)
-                        await self.stream_ended(username)
-                        self.cds[username] = time.time() + cds["offline"]
-                        last_check[username] = new_check[username]
-                    else:
-                        game = new_check[username][1]
-                        logger.info("%s game change at %s", username, currentDT)
-                        await self.game_change(username, game)
-                        self.cds[username] = time.time() + cds["online"]
-                        last_check[username] = new_check[username]
-        return last_check
-
-    @tasks.loop(seconds=60)
+    @tasks.loop(seconds=30)
     async def live_ping(self):
         """
         The function to loop
         """
         logger.info("starting a loop")
-        if self.status == None:
+        """if self.status == None:
             await self.get_initial_status()
         usernames = self.notifications.keys()
         current_status = await self.check_live(usernames, self.status)
         self.status = current_status
-        logger.info(self.status)
+        logger.info(self.status)"""
+        usernames = self.streams.keys()
+        await self.check_live(usernames)
 
     @live_ping.before_loop
     async def before_live_ping(self):
@@ -216,7 +186,7 @@ class DiscordNotif(TwitchCommands):
         Delay start of the loop until the bot object gives the ready event
         """
         await self.start_client()
-        # await self.get_initial_status()
+        await self.get_initial_status()
         logger.info("twitch notifs waiting on bot")
         await self.discord.wait_until_ready()
 
