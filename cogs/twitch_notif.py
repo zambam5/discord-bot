@@ -23,7 +23,7 @@ class DiscordNotif(TwitchCommands, TwitchStatus):
             discord (class): Discord client object
         """
         self.discord = discord
-        self.configpath = "config/twitch.json"
+        self.configpath = "config/twitch-test.json"
         self.process_config(self.configpath)
         self.live_ping.start()
 
@@ -89,15 +89,15 @@ class DiscordNotif(TwitchCommands, TwitchStatus):
     async def stream_starting(self, username, game):
         logger.info("Attempting to post message for %s", username)
         user_info = self.streams[username].ping
-        user_info["guild"] = self.streams[username].guild
+        # user_info["guild"] = self.streams[username].guild
         ping_channel = user_info["channel"]
-        channel = self.discord.get_channel(id=ping_channel)
+        channel = self.discord.get_channel(ping_channel)
         role = user_info["role"]
         if role == user_info["guild"]:
             mention = "@everyone"
         else:
-            g = self.discord.get_guild(id=user_info["guild"])
-            mention = g.get_role(role_id=role).mention
+            g = self.discord.get_guild(user_info["guild"])
+            mention = g.get_role(role).mention
         if not user_info["custom"][0]:
             ping_list = user_info["messages"]
             message = mention + " " + random.choice(ping_list).format(game)
@@ -108,41 +108,6 @@ class DiscordNotif(TwitchCommands, TwitchStatus):
             await self.custom_starting_message(
                 username, user_info, mention, channel, embedded
             )
-        """elif user_info["custom"][1]["embed"]:
-            message_d = user_info["custom"][1]
-            message = mention + " " + message_d["message"]
-            title = message_d["title"]
-            link = message_d["link"]
-            if message_d["url"]:
-                embed = discord.Embed(
-                    title=title,
-                    color=discord.Colour.purple(),
-                    url=message_d["url"],
-                    description=f"[Click here to watch stream](https://twitch.tv/{username})",
-                )
-                embed.set_image(url=link)
-                await channel.purge(limit=100, check=self.is_me)
-                await channel.send(message, embed=embed)
-                self.notifications[username]["ping"]["custom"] = [False]
-                self.update_config()
-            else:
-                embed = discord.Embed(
-                    title=title,
-                    color=discord.Colour.purple(),
-                    url=f"https://twitch.tv/{username}",
-                    description=f"[Click here to watch stream](https://twitch.tv/{username})",
-                )
-                embed.set_image(url=link)
-                await channel.purge(limit=100, check=self.is_me)
-                await channel.send(message, embed=embed)
-                self.notifications[username]["ping"]["custom"] = [False]
-                self.update_config()
-        else:
-            message = mention + " " + user_info["custom"][1]["message"]
-            await channel.purge(limit=100, check=self.is_me)
-            await channel.send(message)
-            self.notifications[username]["ping"]["custom"] = [False]
-            self.update_config()"""
 
     async def stream_ended(self, username):
         user_info = self.streams[username].offline
@@ -150,18 +115,18 @@ class DiscordNotif(TwitchCommands, TwitchStatus):
         ping_list = user_info["messages"]
         if ping_list != False:
             message = random.choice(ping_list)
-            channel = self.discord.get_channel(id=ping_channel)
+            channel = self.discord.get_channel(ping_channel)
             await channel.purge(limit=100, check=self.is_me)
             await channel.send(message)
         else:
-            channel = self.discord.get_channel(id=ping_channel)
+            channel = self.discord.get_channel(ping_channel)
             await channel.purge(limit=100, check=self.is_me)
 
     async def game_change(self, username, game):
         user_info = self.streams[username].game
         ping_channel = user_info["channel"]
         message = user_info["messages"].format(game)
-        channel = self.discord.get_channel(id=ping_channel)
+        channel = self.discord.get_channel(ping_channel)
         await channel.send(message)
 
     @tasks.loop(seconds=30)
@@ -169,15 +134,18 @@ class DiscordNotif(TwitchCommands, TwitchStatus):
         """
         The function to loop
         """
-        logger.info("starting a loop")
+        # logger.info("starting a loop")
         """if self.status == None:
             await self.get_initial_status()
         usernames = self.notifications.keys()
         current_status = await self.check_live(usernames, self.status)
         self.status = current_status
         logger.info(self.status)"""
-        usernames = self.streams.keys()
-        await self.check_live(usernames)
+        try:
+            usernames = self.streams.keys()
+            await self.check_live(usernames)
+        except:
+            logger.exception("Unhandled Exception: ")
 
     @live_ping.before_loop
     async def before_live_ping(self):
@@ -187,10 +155,10 @@ class DiscordNotif(TwitchCommands, TwitchStatus):
         """
         await self.start_client()
         await self.get_initial_status()
-        logger.info("twitch notifs waiting on bot")
-        await self.discord.wait_until_ready()
+        # logger.info("twitch notifs waiting on bot")
+        # await self.discord.wait_until_ready()
 
 
-def setup(bot):
+async def setup(bot):
     logger.info("Twitch notifs loaded")
-    bot.add_cog(DiscordNotif(bot))
+    await bot.add_cog(DiscordNotif(bot))

@@ -137,25 +137,25 @@ class Reminders(commands.Cog):
             with open(self.path, "w") as f:
                 f.write(json.dumps(self.reminder_list))
 
-    @check_reminders.before_loop
+    '''@check_reminders.before_loop
     async def before_check_reminders(self):
         """
         Delay start of the loop until the bot object gives the ready event
         """
         logger.info("Reminders waiting for bot")
-        await self.bot.wait_until_ready()
+        await self.bot.wait_until_ready()'''
 
 
-if os.path.isfile("./config/config.json"):
-    with open("./config/config.json", "r") as f:
+if os.path.isfile("./config/config-test.json"):
+    with open("./config/config-test.json", "r") as f:
         config = json.load(f)
 
 r_config = config["REMINDERS"]
 
 
-def setup(bot):
+async def setup(bot):
     logger.info("Reminders loaded")
-    bot.add_cog(
+    await bot.add_cog(
         Reminders(
             bot,
             r_config["path"],

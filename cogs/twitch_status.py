@@ -23,7 +23,7 @@ class TwitchStatus:
         response = await self.client.get_status(usernames)
         status = await self.process_response(response, usernames)
         for username in usernames:
-            self.streams[username].update_status(status[username])
+            self.streams[username].update_stream_status(status[username])
 
     async def process_response(self, response: list, usernames: list):
         status = {}
@@ -60,6 +60,7 @@ class TwitchStatus:
             list: Current status of the stream
         """
         currentDT = str(datetime.datetime.now())
+        log_message = f"{currentDT}: "
         try:
             response = await self.client.get_status(usernames)
             new_check = await self.process_response(response, usernames)
@@ -72,18 +73,25 @@ class TwitchStatus:
                 g = self.streams[username].status[1]
             else:
                 g = True
-            change = self.streams[username].update_status(new_check[username])
+            change = self.streams[username].update_stream_status(new_check[username])
             if change:
                 if self.streams[username].status[0] and g == True:
                     game = new_check[username][1]
-                    logger.info("%s live at %s", username, currentDT)
+                    # logger.info("%s live at %s", username, currentDT)
+                    log_message += f"{username} changed to live. "
                     await self.stream_starting(username, game)
                 elif not self.streams[username].status[0]:
-                    logger.info("%s offline at %s", username, currentDT)
+                    # logger.info("%s offline at %s", username, currentDT)
+                    log_message += f"{username} changed to offline. "
                     await self.stream_ended(username)
                 else:
                     game = new_check[username][1]
-                    logger.info("%s game change at %s", username, currentDT)
+                    # logger.info("%s game change at %s", username, currentDT)
+                    log_message += f"{username} changed game. "
                     await self.game_change(username, game)
             else:
-                logger.info("No changes")
+                # logger.info("No changes for " + username)
+                # log_message += f"{username} no change. "
+                continue
+        if not log_message:
+            logger.info(log_message)

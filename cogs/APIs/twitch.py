@@ -34,6 +34,7 @@ class TwitchAPI:
         self.headers = {"Client-ID": ID, "Authorization": "Bearer " + access_token}
 
     async def get_auth(self, ID: str, secret: str, refresh=False):
+        # TODO Need to break the get_auth into 2 functions minimum
         """Creates a class attribute for the twith authorization
 
         Args:

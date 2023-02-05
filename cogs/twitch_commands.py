@@ -20,7 +20,7 @@ class TwitchCommands(commands.Cog):
         return m.author == self.discord.user
 
     def update_config(self, channel):
-        logger.info("updating twitch config")
+        logger.info("updating twitch config for %s", channel)
         with open(self.configpath, "r") as f:
             r = json.load(f)
         r["NOTIFICATIONS"][channel] = self.streams[channel].create_dict()
@@ -158,8 +158,8 @@ class TwitchCommands(commands.Cog):
         if role == user_info["guild"]:
             mention = "@everyone"
         else:
-            g = self.discord.get_guild(id=user_info["guild"])
-            mention = g.get_role(role_id=role).mention
+            g = self.discord.get_guild(user_info["guild"])
+            mention = g.get_role(role).mention
         if not user_info["custom"][0]:
             ping_list = user_info["messages"]
             message = mention + " " + random.choice(ping_list).format(game)

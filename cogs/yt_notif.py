@@ -13,7 +13,7 @@ from setuptools import Command
 logger = logging.getLogger("__main__." + __name__)
 
 
-class DiscordNotif(commands.Cog):
+class YoutubeNotif(commands.Cog):
     """
     Class running a loop to send a message in a channel on a new video upload
 
@@ -25,7 +25,7 @@ class DiscordNotif(commands.Cog):
     def __init__(self, bot):
 
         self.bot = bot
-        self.configpath = "config/yt.json"
+        self.configpath = "config/yt-test.json"
         self.process_config(self.configpath)
         self.client = YouTubeAPI(self.TOKEN)
         self.past_videos = {}
@@ -112,13 +112,13 @@ class DiscordNotif(commands.Cog):
         Args:
             channel (str): Youtube channel name from config file
         """
-        last_video = self.past_videos[channel][-1]  # last item in list should be latest
+        # last_video = self.past_videos[channel][-1]  # last item in list should be latest
         new_video = await self.client.latestvideo(
             self.notifications[channel]["playlist_id"]
         )
-        if last_video == new_video[0]:
+        if new_video[0] in self.past_videos[channel]:
             dt = str(datetime.datetime.now())
-            logger.info("%s no new video at %s", channel, dt)
+            print("%s no new video at %s" % (channel, dt))
             return [False]  # no new video, no extra info needed
         else:
             dt = str(datetime.datetime.now())
@@ -126,16 +126,29 @@ class DiscordNotif(commands.Cog):
             path = self.notifications[channel]["path"]
             self.past_videos[channel].append(new_video[0])
             self.update_past_videos(path)
-            return [True, new_video[0]]  # new video, ping will require the new id
+            return [
+                True,
+                new_video[0],
+                new_video[1],
+            ]  # new video, ping will require the new id, new_video[1] determines if short
 
     async def new_video_ping(self, channel):
         results = await self.latest_video_check(channel)
         if results[0]:
-            role = self.mentions[channel]
-            mention = role.mention
             video = results[1]
-            message = random.choice(self.notifications[channel]["messages"])
-            await self.discord[channel].send(message.format(mention, video))
+            short = results[2]
+            if short:
+                message = random.choice(
+                    self.notifications[channel]["messages"]["short"]
+                )
+                await self.discord[channel].send(message.format(video))
+            else:
+                role = self.mentions[channel]
+                mention = role.mention
+                message = random.choice(
+                    self.notifications[channel]["messages"]["video"]
+                )
+                await self.discord[channel].send(message.format(mention, video))
             cd = self.notifications[channel]["cd_post_upload"]
             self.cds[channel] = time.time() + cd
         else:
@@ -154,19 +167,22 @@ class DiscordNotif(commands.Cog):
                 self.cds[channel] = time.time() + self.notifications[channel]["cd"]
                 role = self.notifications[channel]["role"]
                 guild = self.notifications[channel]["guild"]
-                g = self.bot.get_guild(id=guild)
-                self.mentions[channel] = g.get_role(role_id=role)
+                g = self.bot.get_guild(guild)
+                self.mentions[channel] = g.get_role(role)
                 c = self.notifications[channel]["channel"]
-                self.discord[channel] = self.bot.get_channel(id=c)
+                self.discord[channel] = self.bot.get_channel(c)
 
     @tasks.loop(seconds=30)
     async def yt_loop(self):
-        await self.initial_state()
-        for channel in self.notifications.keys():
-            if time.time() > self.cds[channel]:
-                await self.new_video_ping(channel)
-            else:
-                continue
+        try:
+            await self.initial_state()
+            for channel in self.notifications.keys():
+                if time.time() > self.cds[channel]:
+                    await self.new_video_ping(channel)
+                else:
+                    continue
+        except:
+            logger.exception("Unhandled Exception: ")
 
     @yt_loop.before_loop
     async def before_yt_loop(self):
@@ -174,6 +190,6 @@ class DiscordNotif(commands.Cog):
         await self.bot.wait_until_ready()
 
 
-def setup(bot):
+async def setup(bot):
     logger.info("Youtube notifs loaded")
-    bot.add_cog(DiscordNotif(bot))
+    await bot.add_cog(YoutubeNotif(bot))

@@ -10,8 +10,14 @@ logger = logging.getLogger("__main__." + __name__)
 class FFZSync(commands.Cog):
     def __init__(self, bot, config: dict):
         self.bot = bot
-        self.config = config
+        self.process_config(config)
         self.sync_task.start()
+
+    def process_config(self, config):
+        self.config = config
+        for g in config.keys():
+            self.config[g]["cooldown"] = 600
+            self.config[g]["last_check"] = 0
 
     @staticmethod
     async def ffz_api(channel):
@@ -55,7 +61,7 @@ class FFZSync(commands.Cog):
                 x.append(item)
         return x
 
-    async def process_diff(self, diff, guild):
+    async def process_diff(self, diff, guild, channel):
         for item in diff:
             try:
                 emote_im = await item.load_image("4")
@@ -65,17 +71,37 @@ class FFZSync(commands.Cog):
                 except KeyError:
                     emote_im = await item.load_image("1")
             name = item.name
-            await guild.create_custom_emoji(name=name, image=emote_im)
+            try:
+                await guild.create_custom_emoji(name=name, image=emote_im)
+                await channel.send(f"Added {name}")
+            except discord.errors.HTTPException as e:
+                return e.code
+        return True
 
     @tasks.loop(seconds=600)
     async def sync_task(self):
-        for item in self.config.keys():
-            emotes = await self.ffz_api(item)
-            emote_list = self.process_list(emotes)
-            guild = self.bot.get_guild(id=self.config[item])
-            guild_dict = await self.process_guild(guild)
-            diff = self.compare_lists(emote_list, guild_dict)
-            await self.process_diff(diff, guild)
+        try:
+            t = time.time()
+            for g in self.config.keys():
+                if t - self.config[g]["last_check"] < self.config[g]["cooldown"]:
+                    continue
+                emotes = await self.ffz_api(g)
+                emote_list = self.process_list(emotes)
+                guild = self.bot.get_guild(self.config[g]["guild"])
+                channel = self.bot.get_channel(self.config[g]["channel"])
+                guild_dict = await self.process_guild(guild)
+                diff = self.compare_lists(emote_list, guild_dict)
+                x = await self.process_diff(diff, guild, channel)
+                if x != True:
+                    await channel.send(f"Error code {x} when adding an emoji")
+                    self.config[g]["cooldown"] = 3600
+                    logger.info("Error for %s. Increased cooldown.", g)
+                else:
+                    self.config[g]["cooldown"] = 600
+                self.config[g]["last_check"] = t
+        except:
+            logger.exception("Unhandled FFZ task error: ")
+            await asyncio.sleep(3600)
 
     @sync_task.before_loop
     async def before_sync_task(self):
@@ -83,11 +109,11 @@ class FFZSync(commands.Cog):
         await self.bot.wait_until_ready()
 
 
-if os.path.isfile("./config/ffz.json"):
+if os.path.isfile("./config/ffz-test.json"):
     with open("./config/ffz.json", "r") as f:
         config = json.load(f)
 
 
-def setup(bot):
-    logger.info("Twitch notifs loaded")
-    bot.add_cog(FFZSync(bot, config))
+async def setup(bot):
+    logger.info("FFZ Sync loaded")
+    await bot.add_cog(FFZSync(bot, config))

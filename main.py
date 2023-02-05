@@ -1,3 +1,7 @@
+# python3.11
+# TODO Need to add ways to handle errors in requests for APIs
+# TODO Add slash commands
+
 import discord
 from discord.ext.commands import Bot
 from discord import Intents
@@ -5,6 +9,7 @@ import logging
 import datetime
 import json
 import os.path
+import asyncio
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -19,8 +24,8 @@ handler.setFormatter(
 logger.addHandler(handler)
 
 
-if os.path.isfile("./config/config.json"):
-    with open("./config/config.json", "r") as f:
+if os.path.isfile("./config/config-test.json"):
+    with open("./config/config-test.json", "r") as f:
         config = json.load(f)
 
 
@@ -34,8 +39,25 @@ intents = Intents(
     messages=True,
     reactions=False,
     voice_states=True,
+    message_content=True,
+    emojis_and_stickers=True,
 )
-bot = Bot(intents=intents, command_prefix="!")
+
+
+class MyBot(Bot):
+    async def setup_hook(self):
+        await self.load_extension("cogs.reminders")
+        # await bot.load_extension("cogs.streamer_role")
+        await self.load_extension("cogs.roles")
+        await self.load_extension("cogs.wizards_event_posts")
+        await self.load_extension("cogs.misc")
+        # The following commands require waiting for the bot to be ready
+        asyncio.create_task(self.load_extension("cogs.twitch_notif"))
+        asyncio.create_task(self.load_extension("cogs.yt_notif"))
+        asyncio.create_task(self.load_extension("cogs.ffz_sync"))
+
+
+bot = MyBot(intents=intents, command_prefix="!", log_handler=None)
 # bot.tree = app_commands.CommandTree(bot)
 
 
@@ -47,17 +69,11 @@ async def on_ready():
         )
     )
     logger.info("Logged in as " + bot.user.name)
+
     mchannel = bot.get_channel(422170422516121612)
     await mchannel.send("reboot successful")
     # await bot.tree.sync(guild=discord.Object(id=422170422516121610))
     # await bot.tree.sync(guild=discord.Object(id=504675193751601152))
-
-
-bot.load_extension("cogs.reminders")
-# bot.load_extension("cogs.streamer_role")
-bot.load_extension("cogs.misc")
-bot.load_extension("cogs.twitch_notif")
-bot.load_extension("cogs.yt_notif")
 
 
 TOKEN = str(config["DISCORD"]["TOKEN"])

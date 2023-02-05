@@ -45,7 +45,6 @@ class StreamerRole(commands.Cog):
         role = utils.get(guild.roles, name=self.streamer_role)
         liverole = utils.get(guild.roles, name=self.live_role)
         streamers = role.members
-        logger.info("Running the live role check")
         for streamer in streamers:
             if liverole in streamer.roles:
                 if streamer.activity == None:
@@ -69,21 +68,21 @@ class StreamerRole(commands.Cog):
                     else:
                         continue
 
-    @streamer_mode.before_loop
+    '''@streamer_mode.before_loop
     async def before_streamer_mode(self):
         """Delay start of the loop until the bot object gives the ready event"""
-        await self.bot.wait_until_ready()
+        await self.bot.wait_until_ready()'''
 
 
-if os.path.isfile("./config/config.json"):
-    with open("./config/config.json", "r") as f:
+if os.path.isfile("./config/config-test.json"):
+    with open("./config/config-test.json", "r") as f:
         config = json.load(f)
 
 r_config = config["STREAMER_ROLE"]
 
 
-def setup(bot):
-    bot.add_cog(
+async def setup(bot):
+    await bot.add_cog(
         StreamerRole(
             bot, r_config["guild"], r_config["streamer_role"], r_config["live_role"]
         )
